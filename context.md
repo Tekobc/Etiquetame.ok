@@ -569,7 +569,7 @@ Tarjetas simples: pedidos nuevos sin atender, pedidos del mes, productos activos
 ```bash
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY=            # SOLO servidor
 
 # Anti-spam
@@ -588,7 +588,7 @@ UPSTASH_REDIS_REST_URL=
 UPSTASH_REDIS_REST_TOKEN=
 ```
 
-**Deploy:** repo en GitHub → proyecto en Vercel (framework Next.js, Node LTS, `pnpm`). Producción desde `main`, previews por PR. En Supabase: configurar **Site URL** y **Redirect URLs** con el dominio de Vercel (y previews si hacen falta). Migraciones versionadas en `supabase/migrations` y aplicadas con la CLI de Supabase. Documentar todo en el `README.md` (setup local, cómo crear el primer admin, cómo correr migraciones).
+**Deploy:** repo en GitHub → proyecto en Vercel (framework Next.js, Node 22 LTS, `pnpm`). Producción desde `main`, previews por PR. Configurar `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` en Vercel para cada entorno requerido. La clave publicable está diseñada para el cliente; la protección de los datos depende de RLS. **Nunca** agregar `service_role` o `sb_secret` con prefijo `NEXT_PUBLIC_`. En Supabase: configurar **Site URL** y **Redirect URLs** con el dominio de Vercel (y previews si hacen falta). Migraciones versionadas en `supabase/migrations` y aplicadas con la CLI de Supabase. Documentar todo en el `README.md` (setup local, cómo crear el primer admin, cómo correr migraciones). Las variables locales van en `.env.local` (ignorado por Git); pushear el repo no crea las variables en Vercel: configurarlas en Project Settings y volver a desplegar.
 
 ---
 
