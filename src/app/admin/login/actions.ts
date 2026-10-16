@@ -44,5 +44,5 @@ export async function loginAction(
     return { error: "Email o contraseña incorrectos." };
   }
 
-  redirect("/admin");
+  redirect("/admin/pedidos");
 }

@@ -100,6 +100,7 @@ export type Database = {
           details: string;
           category_id: string | null;
           product_id: string | null;
+          client_request_id: string | null;
           status: Database["public"]["Enums"]["order_status"];
           admin_notes: string;
           created_at: string;
@@ -113,6 +114,7 @@ export type Database = {
           details?: string;
           category_id?: string | null;
           product_id?: string | null;
+          client_request_id?: string | null;
           status?: Database["public"]["Enums"]["order_status"];
           admin_notes?: string;
           created_at?: string;
@@ -126,6 +128,7 @@ export type Database = {
           details?: string;
           category_id?: string | null;
           product_id?: string | null;
+          client_request_id?: string | null;
           status?: Database["public"]["Enums"]["order_status"];
           admin_notes?: string;
           created_at?: string;
@@ -164,9 +167,31 @@ export type Database = {
           created_at?: string;
         }
       >;
+      order_rate_limits: Table<
+        {
+          ip_hash: string;
+          window_started_at: string;
+          request_count: number;
+        },
+        {
+          ip_hash: string;
+          window_started_at?: string;
+          request_count?: number;
+        },
+        {
+          ip_hash?: string;
+          window_started_at?: string;
+          request_count?: number;
+        }
+      >;
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      consume_order_rate_limit: {
+        Args: { p_ip_hash: string };
+        Returns: boolean;
+      };
+    };
     Enums: {
       order_status: "nuevo" | "en_proceso" | "listo" | "entregado" | "cancelado";
     };

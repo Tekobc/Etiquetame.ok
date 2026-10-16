@@ -1,7 +1,77 @@
 import Image from "next/image";
 import { categories } from "@/lib/constants";
+import { OrderForm } from "./components/public/order-form";
+import { ProductCatalog } from "./components/public/product-catalog";
+import { createClient } from "@/lib/supabase/server";
+import type { PublicProduct } from "@/lib/products/types";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  let catalogCategories: Array<{ id: string; slug: string; name: string }> = [];
+  let products: PublicProduct[] = [];
+  let catalogLoadError: string | null = null;
+
+  if (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    (!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY &&
+      !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  ) {
+    catalogLoadError = "El catálogo se está preparando. Volvé a visitarnos pronto.";
+  } else {
+    try {
+      const supabase = await createClient();
+      const [categoriesResult, productsResult] = await Promise.all([
+        supabase
+          .from("categories")
+          .select("id, slug, name")
+          .eq("is_active", true)
+          .order("sort_order"),
+        supabase
+          .from("products")
+          .select("id, slug, name, description, category_id, image_path, thumb_path, created_at")
+          .eq("is_active", true)
+          .order("created_at", { ascending: false })
+          .limit(24),
+      ]);
+      const queryError = categoriesResult.error ?? productsResult.error;
+      if (queryError) {
+        throw queryError;
+      }
+
+      catalogCategories = categoriesResult.data ?? [];
+      const categoryMap = new Map(
+        catalogCategories.map((category) => [category.id, category]),
+      );
+      products = (productsResult.data ?? []).flatMap((product) => {
+        const category = categoryMap.get(product.category_id);
+        if (!category) return [];
+        return [
+          {
+            id: product.id,
+            slug: product.slug,
+            name: product.name,
+            description: product.description,
+            categoryId: product.category_id,
+            categorySlug: category.slug,
+            categoryName: category.name,
+            imageUrl: supabase.storage
+              .from("products")
+              .getPublicUrl(product.image_path).data.publicUrl,
+            thumbUrl: supabase.storage
+              .from("products")
+              .getPublicUrl(product.thumb_path).data.publicUrl,
+            createdAt: product.created_at,
+          },
+        ];
+      });
+    } catch (error) {
+      console.error("[catalog] No se pudo cargar el catálogo público:", error);
+      catalogLoadError =
+        "No pudimos cargar los diseños ahora. Volvé a intentarlo más tarde.";
+    }
+  }
+
   return (
     <>
       <header className="site-header">
@@ -17,10 +87,20 @@ export default function Home() {
         </a>
 
         <nav className="main-nav" aria-label="Navegación principal">
+          <a href="#catalogo">Diseños</a>
           <a href="#trabajos">Qué hacemos</a>
-          <a href="#sobre">La tienda</a>
-          <a className="nav-cta" href="#trabajos">
-            Ver los trabajos
+          {process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ? (
+            <a
+              className="nav-social"
+              href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER.replace(/\D/g, "")}`}
+              rel="noreferrer"
+              target="_blank"
+            >
+              WhatsApp
+            </a>
+          ) : null}
+          <a className="nav-cta" href="#pedir">
+            Hacer un pedido
           </a>
         </nav>
       </header>
@@ -42,8 +122,8 @@ export default function Home() {
               Stickers, almanaques, toppers, encendedores y señaladores
               personalizados. Contanos tu idea y la hacemos realidad.
             </p>
-            <a className="button button-primary" href="#trabajos">
-              Descubrí qué hacemos
+            <a className="button button-primary" href="#pedir">
+              Hacer un pedido
               <span aria-hidden="true" className="button-spark">
                 ✳
               </span>
@@ -51,38 +131,30 @@ export default function Home() {
             <p className="hero-note">
               Diseñado con cariño. Preparado especialmente para vos.
             </p>
+            <div className="hero-sticker-cluster" aria-hidden="true">
+              {categories.slice(0, 3).map((category, index) => (
+                <div className={`hero-mini-sticker hero-mini-sticker-${index + 1}`} key={category.slug}>
+                  <Image
+                    alt=""
+                    height={150}
+                    priority={index === 0}
+                    src={category.image}
+                    width={150}
+                  />
+                </div>
+              ))}
+              <span className="hero-mini-caption">Ideas hechas a tu medida ✦</span>
+            </div>
           </div>
 
-          <div className="hero-art" aria-label="Algunos trabajos de Etiquétame">
-            <div className="hero-art-backdrop" />
-            <figure className="hero-photo sticker-photo">
-              <Image
-                src="/images/categorias/stickers.jpeg"
-                alt="Stickers coloridos con frases y diseños propios"
-                width={896}
-                height={1152}
-                sizes="(max-width: 760px) 64vw, 360px"
-                priority
-              />
-            </figure>
-            <figure className="hero-photo calendar-photo">
-              <Image
-                src="/images/categorias/almanaques.jpeg"
-                alt="Almanaques personalizados para emprendimientos"
-                width={900}
-                height={1600}
-                sizes="(max-width: 760px) 28vw, 164px"
-              />
-            </figure>
-            <div className="hero-sticker-note">
-              <span className="note-star" aria-hidden="true">
-                ✦
-              </span>
-              <span>Hecho para vos</span>
-            </div>
-            <div className="hero-dot-pattern" aria-hidden="true" />
-          </div>
+          <OrderForm products={products} />
         </section>
+
+        <ProductCatalog
+          categories={catalogCategories}
+          loadError={catalogLoadError}
+          products={products}
+        />
 
         <section className="work-section section-wrap" id="trabajos">
           <div className="section-heading">
@@ -118,6 +190,12 @@ export default function Home() {
                 <div className="category-copy">
                   <h3>{category.name}</h3>
                   <p>{category.description}</p>
+                  <a
+                    className="category-order-link"
+                    href={`/?categoria=${category.slug}#pedir`}
+                  >
+                    Pedir esto
+                  </a>
                 </div>
               </article>
             ))}
@@ -146,6 +224,21 @@ export default function Home() {
           Etiquétame
         </a>
         <p>Hecho con cariño por Luana, en Argentina.</p>
+        {process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ? (
+          <a
+            href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER.replace(/\D/g, "")}`}
+            rel="noreferrer"
+            target="_blank"
+          >
+            WhatsApp
+          </a>
+        ) : null}
+        {process.env.NEXT_PUBLIC_INSTAGRAM_URL ? (
+          <a href={process.env.NEXT_PUBLIC_INSTAGRAM_URL} rel="noreferrer" target="_blank">
+            Instagram
+          </a>
+        ) : null}
+        <a href="/privacidad">Privacidad</a>
         <a className="back-to-top" href="#inicio">
           Volver al inicio
         </a>

@@ -36,3 +36,13 @@ export async function isAdmin(
 
   return data !== null;
 }
+
+export async function requireAdmin(
+  supabase: SupabaseClient<Database>,
+): Promise<User> {
+  const user = await getAuthenticatedUser(supabase);
+  if (!user || !(await isAdmin(supabase, user.id))) {
+    throw new Error("Se requiere una sesión administrativa válida.");
+  }
+  return user;
+}

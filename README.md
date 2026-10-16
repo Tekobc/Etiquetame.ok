@@ -31,8 +31,9 @@ corepack pnpm dlx supabase@2.121.0 test db
 ```
 
 `db reset` aplica la migración y carga las cinco categorías desde `seed.sql`.
-La prueba pgTAP valida el acceso público y el aislamiento de datos
-administrativos. Para apagar los servicios:
+Las migraciones también incluyen el flujo de pedidos. La prueba pgTAP valida
+el acceso público y el aislamiento de datos administrativos. Para apagar los
+servicios:
 
 ```powershell
 corepack pnpm dlx supabase@2.121.0 stop
@@ -40,19 +41,21 @@ corepack pnpm dlx supabase@2.121.0 stop
 
 ## Supabase remoto
 
-Para enlazar el proyecto y aplicar la migración necesitás iniciar sesión en la
-CLI con una cuenta que tenga acceso administrativo a la base:
+En este proyecto, el schema inicial se ejecutó manualmente en el SQL Editor.
+Por eso, **no uses `db push` todavía**: Supabase puede no tener registrada esa
+migración y tratar de ejecutarla por segunda vez. Para habilitar los cambios
+nuevos, ejecutá en el SQL Editor el contenido de:
 
-```powershell
-corepack pnpm dlx supabase@2.121.0 login
-corepack pnpm dlx supabase@2.121.0 link --project-ref jyhqetwkakilgfhgufoo
-corepack pnpm dlx supabase@2.121.0 db push
-```
+- `supabase/migrations/20261016010407_order_request_workflow.sql`
 
-Después, ejecutá `supabase/seed.sql` en el SQL Editor de Supabase. En
-**Authentication → Settings**, mantené deshabilitados los registros públicos.
-Creá la primera cuenta desde el dashboard de Auth y agregá su ID en el SQL
-Editor:
+El archivo agrega idempotencia y rate limit a pedidos, habilita actualizaciones
+en tiempo real y asegura que el catálogo público solo muestre productos de
+categorías activas. Si todavía no corriste `supabase/seed.sql`, ejecutalo en el
+SQL Editor para cargar las cinco categorías.
+
+En **Authentication → Settings**, mantené deshabilitados los registros
+públicos. Creá la primera cuenta desde el dashboard de Auth y agregá su ID en
+el SQL Editor:
 
 ```sql
 insert into public.admins (user_id)
@@ -65,26 +68,49 @@ utiliza `user_metadata`.
 ## Variables de Vercel
 
 Agregá estas variables en **Project → Settings → Environment Variables** para
-cada entorno requerido (Development, Preview y Production):
+cada entorno que vayas a desplegar (Development, Preview y Production):
 
 ```text
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+SUPABASE_SERVICE_ROLE_KEY
+NEXT_PUBLIC_TURNSTILE_SITE_KEY
+TURNSTILE_SECRET_KEY
+NEXT_PUBLIC_SITE_URL
+NEXT_PUBLIC_WHATSAPP_NUMBER
+NEXT_PUBLIC_INSTAGRAM_URL
 ```
 
 La publishable key es apta para el cliente público; RLS es quien restringe el
 acceso a las filas. Nunca pongas una clave `service_role` o `sb_secret` bajo un
-nombre `NEXT_PUBLIC_`. Las variables de Vercel requieren un despliegue nuevo
-para surtir efecto; conectar el repo a Vercel habilita despliegues automáticos
-desde `main`.
+nombre `NEXT_PUBLIC_`. `SUPABASE_SERVICE_ROLE_KEY` y `TURNSTILE_SECRET_KEY`
+son privadas y solo se usan en el servidor. El formulario de pedidos permanece
+deshabilitado hasta que la URL, la clave publicable, la clave privada de
+Supabase y ambas claves de Turnstile estén configuradas. Creá el widget de
+Turnstile para el dominio final y agregá también el dominio local a sus
+dominios permitidos si vas a probar desde `localhost`.
+
+Las variables de Vercel requieren un deployment nuevo para surtir efecto;
+conectar el repo a Vercel habilita despliegues automáticos desde `main`.
+`NEXT_PUBLIC_WHATSAPP_NUMBER` debe contener solo dígitos con código de país
+(por ejemplo, `54911...`); Instagram debe ser una URL `https://`.
 
 ## Verificaciones
 
 ```powershell
 corepack pnpm lint
 corepack pnpm typecheck
+corepack pnpm test
 corepack pnpm build
 ```
+
+## Estado de la aplicación
+
+La tienda incluye el formulario de pedidos con adjuntos a Storage, protección
+anti-spam, catálogo público y confirmación; el panel permite revisar pedidos,
+descargar archivos y gestionar diseños. El envío de pedidos requiere la nueva
+migración y las variables privadas anteriores. Las pruebas de base pgTAP
+requieren Docker Desktop iniciado.
 
 ## Recursos de marca
 

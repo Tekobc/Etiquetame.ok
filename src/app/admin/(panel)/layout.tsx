@@ -41,6 +41,11 @@ export default async function AdminPanelLayout({
             width={58}
           />
         </Link>
+        <nav className="admin-navigation" aria-label="Administración">
+          <Link href="/admin">Resumen</Link>
+          <Link href="/admin/pedidos">Pedidos</Link>
+          <Link href="/admin/productos">Productos</Link>
+        </nav>
         <div className="admin-header-account">
           <span>Panel de administración</span>
           <form action={logoutAction}>
