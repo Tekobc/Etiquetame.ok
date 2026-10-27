@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/supabase/admin-access";
 import { slugifyProductName } from "@/lib/products/slug";
+import { slugifyCategoryName } from "@/lib/categories/slug";
+import {
+  categoryInputSchema,
+  updateCategoryInputSchema,
+} from "@/lib/validation/category";
 import {
   productInputSchema,
   updateProductInputSchema,
@@ -25,9 +30,94 @@ async function getUniqueSlug(
         cause: error,
       });
     }
+
     if (!data) return slug;
   }
   throw new Error("No se pudo generar un enlace único para este producto.");
+}
+
+async function getUniqueCategorySlug(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  name: string,
+  ignoredCategoryId?: string,
+) {
+  const base = slugifyCategoryName(name);
+  for (let suffix = 1; suffix <= 100; suffix += 1) {
+    const slug = suffix === 1 ? base : `${base}-${suffix}`;
+    let query = supabase.from("categories").select("id").eq("slug", slug);
+    if (ignoredCategoryId) query = query.neq("id", ignoredCategoryId);
+    const { data, error } = await query.maybeSingle();
+    if (error) throw new Error("No se pudo comprobar el nombre de la categoría.", { cause: error });
+    if (!data) return slug;
+  }
+  throw new Error("No se pudo generar un enlace único para esta categoría.");
+}
+
+function assertUuid(value: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(value)) throw new Error("La categoría no es válida.");
+}
+
+export async function createCategoryAction(
+  categoryId: string,
+  input: { name: string; description: string; hasCover: boolean },
+) {
+  const parsed = categoryInputSchema.safeParse({ ...input, id: categoryId });
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Revisá los datos de la categoría.");
+  const supabase = await createClient();
+  await requireAdmin(supabase);
+  const { data: existing, error: existingError } = await supabase
+    .from("categories").select("id").eq("id", parsed.data.id).maybeSingle();
+  if (existingError) throw new Error("No se pudo comprobar la categoría.", { cause: existingError });
+  if (existing) return { id: existing.id };
+  const { error } = await supabase.from("categories").insert({
+    id: parsed.data.id,
+    slug: await getUniqueCategorySlug(supabase, parsed.data.name),
+    name: parsed.data.name,
+    description: parsed.data.description,
+    cover_path: input.hasCover ? `categories/${parsed.data.id}/cover.webp` : null,
+    is_active: true,
+  });
+  if (error) {
+    if (input.hasCover) await supabase.storage.from("products").remove([`categories/${parsed.data.id}/cover.webp`]);
+    throw new Error("No se pudo crear la categoría.", { cause: error });
+  }
+  revalidatePath("/");
+  revalidatePath("/admin/productos");
+  return { id: parsed.data.id };
+}
+
+export async function updateCategoryAction(
+  categoryId: string,
+  input: { name: string; description: string; hasCover: boolean },
+) {
+  assertUuid(categoryId);
+  const parsed = updateCategoryInputSchema.safeParse(input);
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Revisá los datos de la categoría.");
+  const supabase = await createClient();
+  await requireAdmin(supabase);
+  const { data: category, error: queryError } = await supabase
+    .from("categories").select("cover_path").eq("id", categoryId).maybeSingle();
+  if (queryError) throw new Error("No se pudo encontrar la categoría.", { cause: queryError });
+  if (!category) throw new Error("La categoría ya no existe.");
+  const { error } = await supabase.from("categories").update({
+    slug: await getUniqueCategorySlug(supabase, parsed.data.name, categoryId),
+    name: parsed.data.name,
+    description: parsed.data.description,
+    cover_path: input.hasCover ? `categories/${categoryId}/cover.webp` : category.cover_path,
+  }).eq("id", categoryId);
+  if (error) throw new Error("No se pudieron guardar los cambios de la categoría.", { cause: error });
+  revalidatePath("/");
+  revalidatePath("/admin/productos");
+}
+
+export async function setCategoryActiveAction(categoryId: string, isActive: boolean) {
+  assertUuid(categoryId);
+  const supabase = await createClient();
+  await requireAdmin(supabase);
+  const { error } = await supabase.from("categories").update({ is_active: isActive }).eq("id", categoryId);
+  if (error) throw new Error("No se pudo cambiar la visibilidad de la categoría.", { cause: error });
+  revalidatePath("/");
+  revalidatePath("/admin/productos");
 }
 
 export async function createProductAction(

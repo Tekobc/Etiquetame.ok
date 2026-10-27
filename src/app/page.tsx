@@ -1,76 +1,51 @@
-import Image from "next/image";
+﻿import Image from "next/image";
 import { categories } from "@/lib/constants";
 import { OrderForm } from "./components/public/order-form";
 import { ProductCatalog } from "./components/public/product-catalog";
 import { createClient } from "@/lib/supabase/server";
 import type { PublicProduct } from "@/lib/products/types";
 
-export const dynamic = "force-dynamic";
-
 export default async function Home() {
-  let catalogCategories: Array<{ id: string; slug: string; name: string }> = [];
-  let products: PublicProduct[] = [];
-  let catalogLoadError: string | null = null;
-
-  if (
-    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    (!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY &&
-      !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-  ) {
-    catalogLoadError = "El catálogo se está preparando. Volvé a visitarnos pronto.";
-  } else {
-    try {
-      const supabase = await createClient();
-      const [categoriesResult, productsResult] = await Promise.all([
-        supabase
-          .from("categories")
-          .select("id, slug, name")
-          .eq("is_active", true)
-          .order("sort_order"),
-        supabase
-          .from("products")
-          .select("id, slug, name, description, category_id, image_path, thumb_path, created_at")
-          .eq("is_active", true)
-          .order("created_at", { ascending: false })
-          .limit(24),
-      ]);
-      const queryError = categoriesResult.error ?? productsResult.error;
-      if (queryError) {
-        throw queryError;
-      }
-
-      catalogCategories = categoriesResult.data ?? [];
-      const categoryMap = new Map(
-        catalogCategories.map((category) => [category.id, category]),
-      );
-      products = (productsResult.data ?? []).flatMap((product) => {
-        const category = categoryMap.get(product.category_id);
-        if (!category) return [];
-        return [
-          {
-            id: product.id,
-            slug: product.slug,
-            name: product.name,
-            description: product.description,
-            categoryId: product.category_id,
-            categorySlug: category.slug,
-            categoryName: category.name,
-            imageUrl: supabase.storage
-              .from("products")
-              .getPublicUrl(product.image_path).data.publicUrl,
-            thumbUrl: supabase.storage
-              .from("products")
-              .getPublicUrl(product.thumb_path).data.publicUrl,
-            createdAt: product.created_at,
-          },
-        ];
-      });
-    } catch (error) {
-      console.error("[catalog] No se pudo cargar el catálogo público:", error);
-      catalogLoadError =
-        "No pudimos cargar los diseños ahora. Volvé a intentarlo más tarde.";
-    }
+  const supabase = await createClient();
+  const [categoriesResult, productsResult] = await Promise.all([
+    supabase
+      .from("categories")
+      .select("id, slug, name")
+      .eq("is_active", true)
+      .order("sort_order"),
+    supabase
+      .from("products")
+      .select("id, slug, name, description, category_id, image_path, thumb_path, created_at")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(24),
+  ]);
+  const catalogError = categoriesResult.error ?? productsResult.error;
+  if (catalogError) {
+    console.error("[catalog] No se pudo cargar el catálogo público:", catalogError);
   }
+
+  const categoryMap = new Map(
+    (categoriesResult.data ?? []).map((category) => [category.id, category]),
+  );
+  const products: PublicProduct[] = (productsResult.data ?? []).flatMap((product) => {
+    const category = categoryMap.get(product.category_id);
+    if (!category) return [];
+    return [
+      {
+        id: product.id,
+        slug: product.slug,
+        name: product.name,
+        description: product.description,
+        categoryId: product.category_id,
+        categorySlug: category.slug,
+        categoryName: category.name,
+        imageUrl: supabase.storage.from("products").getPublicUrl(product.image_path).data.publicUrl,
+        thumbUrl: supabase.storage.from("products").getPublicUrl(product.thumb_path).data.publicUrl,
+        createdAt: product.created_at,
+      },
+    ];
+  });
 
   return (
     <>
@@ -89,16 +64,6 @@ export default async function Home() {
         <nav className="main-nav" aria-label="Navegación principal">
           <a href="#catalogo">Diseños</a>
           <a href="#trabajos">Qué hacemos</a>
-          {process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ? (
-            <a
-              className="nav-social"
-              href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER.replace(/\D/g, "")}`}
-              rel="noreferrer"
-              target="_blank"
-            >
-              WhatsApp
-            </a>
-          ) : null}
           <a className="nav-cta" href="#pedir">
             Hacer un pedido
           </a>
@@ -151,8 +116,8 @@ export default async function Home() {
         </section>
 
         <ProductCatalog
-          categories={catalogCategories}
-          loadError={catalogLoadError}
+          categories={categoriesResult.data ?? []}
+          loadError={catalogError ? "No pudimos cargar los diseños ahora. Volvé a intentarlo más tarde." : null}
           products={products}
         />
 

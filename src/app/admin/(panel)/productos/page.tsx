@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ProductManager } from "./product-manager";
+import { CategoryManager } from "./category-manager";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/supabase/admin-access";
 
@@ -11,7 +12,7 @@ export default async function AdminProductsPage() {
   const supabase = await createClient();
   await requireAdmin(supabase);
   const [categoriesResult, productsResult] = await Promise.all([
-    supabase.from("categories").select("id, name").order("sort_order"),
+    supabase.from("categories").select("id, name, slug, description, cover_path, is_active, sort_order").order("sort_order"),
     supabase.from("products").select("*").order("created_at", { ascending: false }),
   ]);
 
@@ -21,7 +22,16 @@ export default async function AdminProductsPage() {
     });
   }
 
-  const categories = categoriesResult.data;
+  const categories = categoriesResult.data.map((category) => ({
+    id: category.id,
+    name: category.name,
+    slug: category.slug,
+    description: category.description,
+    coverUrl: category.cover_path
+      ? supabase.storage.from("products").getPublicUrl(category.cover_path).data.publicUrl
+      : null,
+    isActive: category.is_active,
+  }));
   const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
   const products = productsResult.data.map((product) => ({
     id: product.id,
@@ -43,6 +53,7 @@ export default async function AdminProductsPage() {
           <h1>Productos</h1>
         </div>
       </div>
+      <CategoryManager categories={categories} />
       <ProductManager categories={categories} products={products} />
     </main>
   );

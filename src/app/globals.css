@@ -452,6 +452,7 @@ h1 {
 }
 
 .category-copy {
+  position: relative;
   padding: 1rem 0.65rem 0.55rem;
 }
 
@@ -468,6 +469,88 @@ h1 {
   color: #435b60;
   font-size: 0.94rem;
   line-height: 1.55;
+}
+
+.category-products-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-height: 0;
+  margin-top: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(0.35rem);
+  transition: max-height 220ms ease, margin-top 220ms ease, opacity 220ms ease, transform 220ms ease;
+}
+
+.category-card:hover .category-products-preview,
+.category-card:focus-within .category-products-preview {
+  max-height: 4rem;
+  margin-top: 0.7rem;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.category-product-preview {
+  width: 2.8rem;
+  height: 2.8rem;
+  border: 2px solid white;
+  border-radius: 0.65rem;
+  object-fit: cover;
+}
+
+.category-products-preview span {
+  margin-left: 0.2rem;
+  color: #53686c;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.category-manager {
+  margin-bottom: 1.5rem;
+}
+
+.category-admin-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.category-admin-row {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.8rem;
+  border: 1px solid #dce8e4;
+  border-radius: 1rem;
+  background: #fbfdfc;
+}
+
+.category-admin-editor {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: start;
+}
+
+.category-admin-cover {
+  width: 90px;
+  height: 90px;
+  border-radius: 0.8rem;
+  object-fit: cover;
+}
+
+.category-admin-cover-empty {
+  display: grid;
+  place-items: center;
+  padding: 0.5rem;
+  background: #eef5f2;
+  color: #647a78;
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+.category-admin-fields {
+  display: grid;
+  gap: 0.6rem;
 }
 
 .about-section {
