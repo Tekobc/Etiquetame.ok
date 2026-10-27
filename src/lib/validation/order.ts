@@ -61,7 +61,6 @@ export const orderRequestSchema = z
       .default(null),
     productId: z.string().uuid().nullable().default(null),
     website: z.string().max(500).default(""),
-    turnstileToken: z.string().trim().min(1).max(2048),
     files: z.array(orderFileSchema).max(MAX_ORDER_FILES),
   })
   .superRefine((order, context) => {

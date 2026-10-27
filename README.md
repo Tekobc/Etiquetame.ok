@@ -74,8 +74,6 @@ cada entorno que vayas a desplegar (Development, Preview y Production):
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 SUPABASE_SERVICE_ROLE_KEY
-NEXT_PUBLIC_TURNSTILE_SITE_KEY
-TURNSTILE_SECRET_KEY
 NEXT_PUBLIC_SITE_URL
 NEXT_PUBLIC_WHATSAPP_NUMBER
 NEXT_PUBLIC_INSTAGRAM_URL
@@ -83,12 +81,10 @@ NEXT_PUBLIC_INSTAGRAM_URL
 
 La publishable key es apta para el cliente público; RLS es quien restringe el
 acceso a las filas. Nunca pongas una clave `service_role` o `sb_secret` bajo un
-nombre `NEXT_PUBLIC_`. `SUPABASE_SERVICE_ROLE_KEY` y `TURNSTILE_SECRET_KEY`
-son privadas y solo se usan en el servidor. El formulario de pedidos permanece
-deshabilitado hasta que la URL, la clave publicable, la clave privada de
-Supabase y ambas claves de Turnstile estén configuradas. Creá el widget de
-Turnstile para el dominio final y agregá también el dominio local a sus
-dominios permitidos si vas a probar desde `localhost`.
+nombre `NEXT_PUBLIC_`. `SUPABASE_SERVICE_ROLE_KEY` es privada y solo se usa en
+el servidor. El formulario usa un honeypot y un límite de cinco solicitudes por
+IP cada hora, aplicado por Supabase, para reducir spam sin depender de un
+servicio externo.
 
 Las variables de Vercel requieren un deployment nuevo para surtir efecto;
 conectar el repo a Vercel habilita despliegues automáticos desde `main`.
@@ -109,8 +105,8 @@ corepack pnpm build
 La tienda incluye el formulario de pedidos con adjuntos a Storage, protección
 anti-spam, catálogo público y confirmación; el panel permite revisar pedidos,
 descargar archivos y gestionar diseños. El envío de pedidos requiere la nueva
-migración y las variables privadas anteriores. Las pruebas de base pgTAP
-requieren Docker Desktop iniciado.
+migración y `SUPABASE_SERVICE_ROLE_KEY`. Las pruebas de base pgTAP requieren
+Docker Desktop iniciado.
 
 ## Recursos de marca
 

@@ -1273,7 +1273,6 @@ h1 {
 .order-file-drop,
 .order-file-list,
 .order-honeypot,
-.turnstile-container,
 .privacy-notice,
 .order-submit {
   grid-column: 1 / -1;
@@ -1392,12 +1391,6 @@ h1 {
   width: 1px;
   height: 1px;
   overflow: hidden;
-}
-
-.turnstile-container {
-  display: flex;
-  min-height: 66px;
-  align-items: center;
 }
 
 .privacy-notice {
@@ -1602,7 +1595,6 @@ h1 {
   .order-file-drop,
   .order-file-list,
   .order-honeypot,
-  .turnstile-container,
   .privacy-notice,
   .order-submit {
     grid-column: 1;

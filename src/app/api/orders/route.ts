@@ -11,35 +11,6 @@ function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
 }
 
-async function verifyTurnstile(token: string, remoteIp: string | null) {
-  const secret = process.env.TURNSTILE_SECRET_KEY;
-  if (!secret) {
-    throw new Error("Turnstile no está configurado en el servidor.");
-  }
-
-  const response = await fetch(
-    "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        secret,
-        response: token,
-        ...(remoteIp ? { remoteip: remoteIp } : {}),
-        idempotency_key: randomUUID(),
-      }),
-      cache: "no-store",
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error(`Turnstile devolvió HTTP ${response.status}.`);
-  }
-
-  const result: { success?: boolean } = await response.json();
-  return result.success === true;
-}
-
 function getClientIp(request: NextRequest) {
   const forwardedFor = request.headers.get("x-forwarded-for");
   return (
@@ -156,31 +127,6 @@ export async function POST(request: NextRequest) {
       { ok: true, orderId: null, uploads: [] },
       { status: 202 },
     );
-  }
-
-  if (!process.env.TURNSTILE_SECRET_KEY) {
-    return jsonError(
-      "El formulario todavía no está habilitado. Falta configurar la protección antispam.",
-      503,
-    );
-  }
-
-  let turnstileValid: boolean;
-  try {
-    turnstileValid = await verifyTurnstile(
-      order.turnstileToken,
-      getClientIp(request),
-    );
-  } catch (error) {
-    console.error("[orders] No se pudo verificar Turnstile:", error);
-    return jsonError(
-      "No se pudo verificar la protección antispam. Probá de nuevo en unos minutos.",
-      503,
-    );
-  }
-
-  if (!turnstileValid) {
-    return jsonError("Completá la verificación antispam para continuar.", 400);
   }
 
   let supabase: ReturnType<typeof createAdminClient>;

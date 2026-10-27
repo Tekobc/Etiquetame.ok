@@ -8,7 +8,6 @@ const validOrder = {
   customerName: "Luana",
   phone: "+54 9 11 1234-5678",
   summary: "Stickers para mi emprendimiento",
-  turnstileToken: "valid-token",
   files: [],
 };
 

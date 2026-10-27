@@ -109,7 +109,7 @@ Reglas de color: el amarillo y el turquesa son protagonistas; los pasteles apare
 | Cliente Supabase | `@supabase/ssr` + `@supabase/supabase-js` | Sesión por cookies en App Router. |
 | Procesado de imagen (cliente) | Canvas API nativa (sin dependencia) | Ver sección 11. |
 | ZIP de adjuntos | `jszip` (solo en admin, import dinámico) | Descargar todos los adjuntos de un pedido de una vez. |
-| Anti-spam | **Cloudflare Turnstile** + honeypot | El formulario público escribe en la base; hay que protegerlo. |
+| Anti-spam | Honeypot + rate limit en Supabase | El formulario público escribe en la base; hay que protegerlo sin depender de un servicio externo. |
 | Package manager | `pnpm` | |
 | Deploy | **Vercel** (preview por PR + producción en `main`) | |
 
@@ -387,7 +387,6 @@ Campos (schema zod compartido, `lib/validation/order.ts`):
 | Tipo de trabajo | select | opcional, las 5 categorías |
 | Archivos | dropzone | opcional, **múltiples**, ver límites abajo |
 | `website` (honeypot) | oculto | debe llegar vacío |
-| Turnstile token | oculto | requerido |
 
 **Límites de archivos (constantes en `lib/constants.ts`):** máx. **10 archivos**, **15 MB c/u**, **40 MB totales**. Tipos: `image/jpeg`, `image/png`, `image/webp`, `image/heic`, `image/heif`, `application/pdf`, `image/svg+xml`, y, por ser archivos de diseño frecuentes, `application/zip`, `application/postscript` (.ai/.eps). *(SVG se guarda pero **nunca se renderiza inline** en el admin: solo se descarga o se muestra con `<img>`.)*
 
@@ -435,7 +434,7 @@ Logo, WhatsApp, Instagram, texto corto de la marca, "by Luana". Los datos de con
 
 ```
 Navegador                         Route Handler (Vercel)                 Supabase
-   │ 1. POST /api/orders ───────────▶ valida zod + Turnstile + honeypot
+   │ 1. POST /api/orders ───────────▶ valida zod + honeypot + rate limit
    │    {datos, files:[{name,type,size}]}   rate limit por IP
    │                                  INSERT orders + order_attachments ─▶ (service_role)
    │                                  createSignedUploadUrl × N ────────▶ Storage
@@ -449,7 +448,7 @@ Navegador                         Route Handler (Vercel)                 Supabas
 Reglas:
 
 1. **Validación en el servidor es la verdad.** Volver a validar con el mismo schema zod: cantidad, tamaño y MIME **declarados**; sanear nombres de archivo (quitar `/`, `..`, caracteres de control, limitar longitud); generar el path de Storage en el servidor (`{orderId}/{uuid}-{nombreSaneado}`), nunca aceptar un path del cliente.
-2. **Turnstile** se verifica server-side contra la API de Cloudflare. Honeypot lleno → responder 200 "ok" silencioso sin guardar nada.
+2. El honeypot lleno responde 200 "ok" silencioso sin guardar nada. Supabase aplica un límite de cinco solicitudes por IP cada hora.
 3. **Rate limit** por IP (ej. 5 pedidos/hora). Implementación simple: tabla `rate_limits` o Upstash Redis si se prefiere; documentar la elegida. Sin esto, el endpoint es abusable.
 4. Si falla la subida de algún archivo, el pedido **igual queda creado** (los datos son lo importante); el cliente ve qué archivos fallaron, puede reintentar, y el admin ve los adjuntos con `uploaded=false` marcados como "no subido".
 5. `/confirm` verifica en Storage que los objetos existan realmente antes de marcar `uploaded=true`. Si no existen, no los marca.
@@ -554,7 +553,6 @@ Tarjetas simples: pedidos nuevos sin atender, pedidos del mes, productos activos
 - [ ] Validación de MIME **y** de extensión; nunca confiar en el `Content-Type` declarado como única defensa. Los adjuntos no se ejecutan ni se renderizan como HTML.
 - [ ] SVG nunca inline; solo `<img>` o descarga.
 - [ ] Sanitizar/escapar todo texto del usuario al mostrarlo en admin (React ya escapa; **prohibido `dangerouslySetInnerHTML`** con datos de pedidos).
-- [ ] Turnstile + honeypot + rate limit en `/api/orders`.
 - [ ] Headers de seguridad en `next.config` (CSP razonable, `X-Content-Type-Options`, `Referrer-Policy`, `frame-ancestors 'none'`).
 - [ ] Sin signup público en Supabase Auth; política de contraseñas mínima; recomendar activar MFA para la cuenta admin.
 - [ ] Datos personales (nombre, teléfono): solo visibles al admin. Incluir en el sitio una **política de privacidad** simple (Ley 25.326 de Protección de Datos Personales, Argentina) y una casilla/aviso en el formulario ("Usamos tus datos solo para contactarte por tu pedido").
@@ -572,9 +570,6 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY=            # SOLO servidor
 
-# Anti-spam
-NEXT_PUBLIC_TURNSTILE_SITE_KEY=
-TURNSTILE_SECRET_KEY=                 # SOLO servidor
 
 # Sitio
 NEXT_PUBLIC_SITE_URL=https://etiquetame.vercel.app
@@ -603,7 +598,7 @@ Migración `0001_init.sql`, seed de categorías, buckets y policies, clientes Su
 **Aceptación:** un usuario no admin no puede entrar a `/admin`; un cliente `anon` no puede leer `orders`; el admin ve un panel vacío.
 
 ### Fase 2 — Pedido end-to-end
-Formulario + dropzone + flujo de la sección 9 (init → subida firmada → confirm), Turnstile, honeypot, rate limit, pantalla de éxito.
+Formulario + dropzone + flujo de la sección 9 (init → subida firmada → confirm), honeypot, rate limit, pantalla de éxito.
 **Aceptación:** crear un pedido con 3 fotos desde un celular se refleja en la base y en Storage; un archivo no permitido o demasiado grande es rechazado con mensaje claro; el doble click no duplica.
 
 ### Fase 3 — Admin de pedidos

@@ -1,6 +1,5 @@
 "use client";
 
-import Script from "next/script";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -110,8 +109,6 @@ export function OrderForm({ products }: { products: PublicProduct[] }) {
   const [fileError, setFileError] = useState<string | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [turnstileReady, setTurnstileReady] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState("");
   const [requestId, setRequestId] = useState("");
   const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
   const [categorySlug, setCategorySlug] = useState("");
@@ -123,9 +120,6 @@ export function OrderForm({ products }: { products: PublicProduct[] }) {
   const [website, setWebsite] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const turnstileContainerRef = useRef<HTMLDivElement>(null);
-  const turnstileIdRef = useRef<string | null>(null);
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
   const totalFileBytes = useMemo(
     () => files.reduce((total, selected) => total + selected.file.size, 0),
@@ -165,33 +159,6 @@ export function OrderForm({ products }: { products: PublicProduct[] }) {
     return () =>
       window.removeEventListener("etiquetame:product-selected", handleProductSelected);
   }, []);
-
-  useEffect(() => {
-    if (
-      !siteKey ||
-      !turnstileReady ||
-      !turnstileContainerRef.current ||
-      !window.turnstile
-    ) {
-      return;
-    }
-
-    const widgetId = window.turnstile.render(turnstileContainerRef.current, {
-      sitekey: siteKey,
-      callback: setTurnstileToken,
-      "expired-callback": () => setTurnstileToken(""),
-      "error-callback": () => setTurnstileToken(""),
-      theme: "light",
-    });
-    turnstileIdRef.current = widgetId;
-
-    return () => {
-      if (turnstileIdRef.current && window.turnstile) {
-        window.turnstile.remove(turnstileIdRef.current);
-        turnstileIdRef.current = null;
-      }
-    };
-  }, [siteKey, turnstileReady]);
 
   async function addFiles(fileList: FileList | File[]) {
     setFileError(null);
@@ -243,15 +210,6 @@ export function OrderForm({ products }: { products: PublicProduct[] }) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setRequestError(null);
-    if (!siteKey || !turnstileToken) {
-      setRequestError(
-        siteKey
-          ? "Completá la verificación antispam para enviar tu pedido."
-          : "El formulario está en preparación. Volvé a intentarlo más tarde.",
-      );
-      return;
-    }
-
     setIsSubmitting(true);
     const clientRequestId = requestId || crypto.randomUUID();
     setRequestId(clientRequestId);
@@ -269,7 +227,6 @@ export function OrderForm({ products }: { products: PublicProduct[] }) {
           categorySlug: categorySlug || null,
           productId: productId || null,
           website,
-          turnstileToken,
           files: files.map(({ file }) => ({
             name: file.name,
             type: file.type,
@@ -343,10 +300,6 @@ export function OrderForm({ products }: { products: PublicProduct[] }) {
       );
     } finally {
       setIsSubmitting(false);
-      setTurnstileToken("");
-      if (turnstileIdRef.current && window.turnstile) {
-        window.turnstile.reset(turnstileIdRef.current);
-      }
     }
   }
 
@@ -392,14 +345,6 @@ export function OrderForm({ products }: { products: PublicProduct[] }) {
 
   return (
     <section className="order-card" id="pedir" aria-labelledby="order-form-title">
-      {siteKey ? (
-        <Script
-          id="cloudflare-turnstile"
-          src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
-          strategy="afterInteractive"
-          onLoad={() => setTurnstileReady(true)}
-        />
-      ) : null}
       <p className="eyebrow">Tu próximo proyecto empieza acá</p>
       <h2 id="order-form-title">Contame qué tenés en mente.</h2>
       <p className="order-intro">
@@ -535,13 +480,9 @@ export function OrderForm({ products }: { products: PublicProduct[] }) {
             value={website}
           />
         </label>
-        {siteKey ? (
-          <div className="turnstile-container" ref={turnstileContainerRef} />
-        ) : (
-          <p className="form-message" role="status">
-            El formulario está en preparación y todavía no recibe pedidos.
-          </p>
-        )}
+        <p className="form-message" role="status">
+          Podés enviar tu pedido directamente; te responderemos por WhatsApp o teléfono.
+        </p>
         {requestError ? <p className="form-message" role="alert">{requestError}</p> : null}
         <p className="privacy-notice">
           Usamos tus datos únicamente para responder por este pedido.{" "}
@@ -549,7 +490,7 @@ export function OrderForm({ products }: { products: PublicProduct[] }) {
         </p>
         <button
           className="button button-primary order-submit"
-          disabled={isSubmitting || !siteKey}
+          disabled={isSubmitting}
           type="submit"
         >
           {isSubmitting ? "Enviando tu idea..." : "Enviar pedido"}
